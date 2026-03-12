@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#15803d" />
+  <meta name="description" content="عداد تسبيح بسيط يعمل كـ PWA مع حفظ محلي ونسخة احتياطية وإحصاءات يومية ومتعددة الأيام." />
+  <title>عداد التسبيح</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Cairo', Arial, sans-serif; }
+    :root {
+      --bg1:#f4f7f5; --bg2:#dfeee7; --card:#ffffff; --text:#1f2937; --muted:#4b5563;
+      --title:#14532d; --accent:#15803d; --accent-dark:#166534; --soft:#e5e7eb; --input:#ffffff;
+      --danger-bg:#fee2e2; --danger-text:#991b1b; --success-bg:#dcfce7; --success-text:#166534;
+      --shadow:rgba(0,0,0,.12);
+    }
+    body.dark {
+      --bg1:#0f172a; --bg2:#111827; --card:#1f2937; --text:#f3f4f6; --muted:#d1d5db;
+      --title:#bbf7d0; --accent:#22c55e; --accent-dark:#16a34a; --soft:#374151; --input:#111827;
+      --danger-bg:#3f1d1d; --danger-text:#fecaca; --success-bg:#16351f; --success-text:#bbf7d0;
+      --shadow:rgba(0,0,0,.35);
+    }
+    body {
+      background: linear-gradient(135deg, var(--bg1), var(--bg2)); min-height:100vh; display:flex;
+      justify-content:center; align-items:center; padding:20px; color:var(--text);
+      transition: background .3s ease, color .3s ease;
+    }
+    .app {
+      width:100%; max-width:760px; background:var(--card); border-radius:24px; box-shadow:0 12px 30px var(--shadow);
+      padding:28px; text-align:center; border:1px solid rgba(255,255,255,.08);
+    }
+    .grid2,.top-bar,.actions-grid,.stats-grid,.buttons,.mini-stats { display:grid; grid-template-columns:repeat(2,1fr); gap:10px; }
+    .stats-grid { grid-template-columns:repeat(3,1fr); }
+    .card-section {
+      background: rgba(255,255,255,.04); border:1px solid rgba(127,127,127,.12); border-radius:18px;
+      padding:16px; margin-bottom:16px; text-align:right;
+    }
+    .section-title { font-size:1.05rem; font-weight:700; color:var(--title); margin-bottom:10px; }
+    h1 { font-size:2rem; margin-bottom:8px; color:var(--title); }
+    .subtitle,.footer-note,.hint { font-size:.92rem; color:var(--muted); line-height:1.7; }
+    .subtitle { margin-bottom:24px; text-align:center; }
+    .footer-note { margin-top:8px; text-align:right; }
+    .chip,button,input,select,textarea { border-radius:12px; }
+    .chip,button { border:none; cursor:pointer; font-weight:700; }
+    .chip,button.secondary,button.export-btn,button.import-btn,button.save-goal-btn,button.install-btn,button.top-chip {
+      background:var(--soft); color:var(--text); padding:12px;
+    }
+    button.add-btn { background:var(--success-bg); color:var(--success-text); padding:12px; }
+    button.delete-btn { background:var(--danger-bg); color:var(--danger-text); padding:12px; }
+    input,select,textarea {
+      width:100%; padding:12px 14px; font-size:1rem; text-align:right; border:1px solid #cbd5e1;
+      background:var(--input); color:var(--text);
+    }
+    body.dark input, body.dark select, body.dark textarea { border-color:#4b5563; }
+    .dhikr-name {
+      font-size:1.6rem; font-weight:700; margin-bottom:16px; color:var(--title); line-height:1.8;
+      min-height:58px; display:flex; align-items:center; justify-content:center; text-align:center;
+    }
+    .counter { font-size:4.2rem; font-weight:800; color:var(--accent-dark); margin-bottom:20px; text-align:center; }
+    .main-btn {
+      width:100%; padding:18px; font-size:1.25rem; border:none; border-radius:16px;
+      background:linear-gradient(135deg,var(--accent),var(--accent-dark)); color:white;
+      cursor:pointer; margin:18px 0 12px; user-select:none; -webkit-tap-highlight-color:transparent;
+    }
+    .main-btn:active,.main-btn.pulse { transform:scale(.98); }
+    .progress-text { margin-top:10px; font-size:.95rem; color:var(--muted); text-align:center; }
+    .progress-bar { width:100%; height:12px; background:var(--soft); border-radius:999px; overflow:hidden; margin-top:10px; }
+    .progress-fill { height:100%; width:0%; background:linear-gradient(90deg,var(--accent),var(--accent-dark)); transition:width .25s ease; }
+    .badge { display:inline-block; margin-top:8px; background:var(--success-bg); color:var(--success-text); padding:6px 10px; border-radius:999px; font-size:.85rem; font-weight:700; }
+    .adhkar-list,.history-list { display:grid; gap:10px; margin-top:10px; max-height:260px; overflow-y:auto; }
+    .dhikr-item,.history-item,.empty { background:var(--soft); border-radius:12px; padding:12px; line-height:1.7; font-size:.95rem; }
+    .dhikr-item { display:grid; grid-template-columns:1fr auto; gap:8px; align-items:center; }
+    .dhikr-text { font-weight:700; }
+    .dhikr-meta { font-size:.82rem; color:var(--muted); }
+    .pill { display:inline-block; padding:5px 10px; border-radius:999px; background:rgba(21,128,61,.12); color:var(--accent-dark); font-size:.8rem; font-weight:700; white-space:nowrap; }
+    .stat-box { background:var(--soft); border-radius:14px; padding:14px; text-align:center; }
+    .stat-title { font-size:.88rem; color:var(--muted); margin-bottom:6px; }
+    .stat-value { font-size:1.15rem; font-weight:700; color:var(--title); }
+    .hidden { display:none; }
+    @media (max-width:700px) {
+      .app { padding:20px; }
+      .grid2,.top-bar,.actions-grid,.stats-grid,.buttons,.mini-stats,.dhikr-item { grid-template-columns:1fr; }
+      .counter { font-size:3.5rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="top-bar">
+      <button class="top-chip" id="themeToggleBtn">الوضع الداكن</button>
+      <button class="top-chip" id="resetTodayBtn">تصفير سجل اليوم</button>
+    </div>
+
+    <div class="actions-grid" style="margin-bottom:16px;">
+      <button class="export-btn" id="exportBtn">تصدير البيانات</button>
+      <button class="import-btn" id="importBtn">استيراد البيانات</button>
+    </div>
+
+    <h1>عداد التسبيح</h1>
+    <p class="subtitle">عداد للأذكار مع بحث، وإحصاءات متعددة الأيام، وحفظ محلي، ودعم التثبيت كـ PWA.</p>
+
+    <div class="card-section">
+      <div class="section-title">التثبيت</div>
+      <div class="actions-grid">
+        <button class="install-btn" id="installBtn" disabled>تثبيت التطبيق</button>
+        <button class="install-btn" id="offlineHelpBtn">تعليمات النشر</button>
+      </div>
+      <div class="hint">بعد رفع الملفات على GitHub Pages أو Netlify سيظهر زر التثبيت بشكل أفضل.</div>
+    </div>
+
+    <div class="card-section">
+      <div class="section-title">اختيار الذكر</div>
+      <select id="dhikrSelect"></select>
+      <div class="dhikr-name" id="dhikrName">سبحان الله</div>
+      <div class="counter" id="counter">0</div>
+      <button class="main-btn" id="countBtn">تسبيحة +1</button>
+      <div class="buttons">
+        <button class="secondary" id="decreaseBtn">-1</button>
+        <button class="secondary" id="resetBtn">إعادة تصفير الذكر الحالي</button>
+      </div>
+    </div>
+
+    <div class="card-section">
+      <div class="section-title">هدف الذكر الحالي</div>
+      <div class="grid2">
+        <input type="number" id="goalInput" min="1" value="33" />
+        <button class="save-goal-btn" id="saveGoalBtn">حفظ الهدف</button>
+      </div>
+      <div class="progress-text" id="progressText">0 / 33 تم إنجازه</div>
+      <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+      <div class="badge hidden" id="goalBadge">تم الوصول إلى الهدف</div>
+    </div>
+
+    <div class="card-section">
+      <div class="section-title">البحث</div>
+      <div class="grid2">
+        <input type="text" id="searchInput" placeholder="ابحث عن ذكر..." />
+        <button class="secondary" id="clearSearchBtn">مسح البحث</button>
+      </div>
+    </div>
+
+    <div class="card-section">
+      <div class="section-title">إضافة ذكر جديد</div>
+      <input type="text" id="newDhikrInput" placeholder="اكتب الذكر هنا مثل: لا حول ولا قوة إلا بالله" />
+      <div class="actions-grid" style="margin-top:10px;">
+        <button class="add-btn" id="addDhikrBtn">إضافة</button>
+        <button class="delete-btn" id="deleteDhikrBtn">حذف الذكر الحالي</button>
+      </div>
+    </div>
+
+    <div class="card-section">
+      <div class="section-title">قائمة الأذكار</div>
+      <div class="adhkar-list" id="adhkarList"></div>
+    </div>
+
+    <div class="card-section">
+      <div class="section-title">إحصاءات اليوم</div>
+      <div class="mini-stats">
+        <div class="stat-box"><div class="stat-title">عدد هذا الذكر اليوم</div><div class="stat-value" id="todayCurrentDhikrCount">0</div></div>
+        <div class="stat-box"><div class="stat-title">إجمالي الأذكار اليوم</div><div class="stat-value" id="todayTotalCount">0</div></div>
+      </div>
+    </div>
+
+    <div class="card-section">
+      <div class="section-title">إحصاءات متعددة الأيام</div>
+      <div class="stats-grid">
+        <div class="stat-box"><div class="stat-title">آخر 7 أيام</div><div class="stat-value" id="last7DaysTotal">0</div></div>
+        <div class="stat-box"><div class="stat-title">آخر 30 يوماً</div><div class="stat-value" id="last30DaysTotal">0</div></div>
+        <div class="stat-box"><div class="stat-title">عدد الأيام النشطة</div><div class="stat-value" id="activeDaysCount">0</div></div>
+      </div>
+    </div>
+
+    <div class="card-section">
+      <div class="section-title">سجل اليوم</div>
+      <div class="history-list" id="historyList"></div>
+    </div>
+
+    <div class="card-section hidden" id="importSection">
+      <div class="section-title">استيراد نسخة احتياطية</div>
+      <textarea id="importTextArea" rows="8" placeholder="ألصق JSON هنا"></textarea>
+      <div class="actions-grid" style="margin-top:10px;">
+        <button class="import-btn" id="confirmImportBtn">تأكيد الاستيراد</button>
+        <button class="secondary" id="cancelImportBtn">إلغاء</button>
+      </div>
+      <div class="hint">سيتم استبدال البيانات الحالية بالكامل بالبيانات المستوردة.</div>
+    </div>
+
+    <input type="file" id="fileInput" class="hidden" accept="application/json,.json" />
+    <p class="footer-note">يتم حفظ كل شيء تلقائياً داخل المتصفح: الأذكار، العدادات، الأهداف، السجل، والإعدادات.</p>
+  </div>
+
+  <script>
+    const el = id => document.getElementById(id);
+    const dhikrSelect = el('dhikrSelect'), dhikrName = el('dhikrName'), counterEl = el('counter');
+    const goalInput = el('goalInput'), saveGoalBtn = el('saveGoalBtn'), progressText = el('progressText');
+    const progressFill = el('progressFill'), goalBadge = el('goalBadge'), countBtn = el('countBtn');
+    const decreaseBtn = el('decreaseBtn'), resetBtn = el('resetBtn'), searchInput = el('searchInput');
+    const clearSearchBtn = el('clearSearchBtn'), newDhikrInput = el('newDhikrInput'), addDhikrBtn = el('addDhikrBtn');
+    const deleteDhikrBtn = el('deleteDhikrBtn'), adhkarList = el('adhkarList');
+    const todayCurrentDhikrCount = el('todayCurrentDhikrCount'), todayTotalCount = el('todayTotalCount');
+    const last7DaysTotal = el('last7DaysTotal'), last30DaysTotal = el('last30DaysTotal'), activeDaysCount = el('activeDaysCount');
+    const historyList = el('historyList'), themeToggleBtn = el('themeToggleBtn'), resetTodayBtn = el('resetTodayBtn');
+    const exportBtn = el('exportBtn'), importBtn = el('importBtn'), importSection = el('importSection');
+    const importTextArea = el('importTextArea'), confirmImportBtn = el('confirmImportBtn'), cancelImportBtn = el('cancelImportBtn');
+    const fileInput = el('fileInput'), installBtn = el('installBtn'), offlineHelpBtn = el('offlineHelpBtn');
+
+    const defaultAdhkar = ['سبحان الله','الحمد لله','الله أكبر','لا إله إلا الله','أستغفر الله','اللهم صل على محمد'];
+    let deferredPrompt = null, audioContext = null;
+
+    function todayKey(offset=0){ const d=new Date(); d.setDate(d.getDate()-offset); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
+    function formatTime(date){ return date.toLocaleTimeString('ar-EG',{hour:'2-digit',minute:'2-digit'}); }
+
+    let state = JSON.parse(localStorage.getItem('dhikrAppState')) || {
+      selectedDhikr:'سبحان الله', adhkar:[...defaultAdhkar], counts:{}, goals:{}, dailyHistory:{}, theme:'light',
+      soundEnabled:true, vibrationEnabled:true, searchTerm:''
+    };
+
+    function ensureState(){
+      if (!Array.isArray(state.adhkar) || !state.adhkar.length) state.adhkar = [...defaultAdhkar];
+      state.adhkar = state.adhkar.map(v => typeof v === 'string' ? v.trim() : String(v?.text || '').trim()).filter(Boolean);
+      if (!state.counts || typeof state.counts !== 'object') state.counts = {};
+      if (!state.goals || typeof state.goals !== 'object') state.goals = {};
+      if (!state.dailyHistory || typeof state.dailyHistory !== 'object') state.dailyHistory = {};
+      if (typeof state.searchTerm !== 'string') state.searchTerm = '';
+      if (state.theme !== 'dark' && state.theme !== 'light') state.theme = 'light';
+      state.adhkar.forEach(d => { if (typeof state.counts[d] !== 'number') state.counts[d] = 0; if (typeof state.goals[d] !== 'number' || state.goals[d] < 1) state.goals[d] = 33; });
+      if (!state.selectedDhikr || !state.adhkar.includes(state.selectedDhikr)) state.selectedDhikr = state.adhkar[0];
+      const tk = todayKey();
+      if (!state.dailyHistory[tk]) state.dailyHistory[tk] = { totals:{}, events:[] };
+      state.adhkar.forEach(d => { if (typeof state.dailyHistory[tk].totals[d] !== 'number') state.dailyHistory[tk].totals[d] = 0; });
+    }
+    function saveState(){ localStorage.setItem('dhikrAppState', JSON.stringify(state)); }
+    function getTodayData(){ ensureState(); return state.dailyHistory[todayKey()]; }
+    function getCurrentCount(){ return state.counts[state.selectedDhikr] || 0; }
+    function getCurrentGoal(){ return Math.max(1, Number(state.goals[state.selectedDhikr]) || 1); }
+    function addHistoryEvent(dhikr, action){ getTodayData().events.push({ dhikr, action, time: formatTime(new Date()) }); }
+    function getFilteredAdhkar(){ const term = state.searchTerm.trim().toLowerCase(); return state.adhkar.filter(d => !term || d.toLowerCase().includes(term)); }
+
+    function renderDhikrOptions(){
+      const source = getFilteredAdhkar().length ? getFilteredAdhkar() : state.adhkar;
+      dhikrSelect.innerHTML = '';
+      source.forEach(d => { const o = document.createElement('option'); o.value = d; o.textContent = d; dhikrSelect.appendChild(o); });
+      if (!source.includes(state.selectedDhikr)) state.selectedDhikr = source[0];
+      dhikrSelect.value = state.selectedDhikr;
+    }
+    function renderAdhkarList(){
+      const items = getFilteredAdhkar(); adhkarList.innerHTML = '';
+      if (!items.length) { adhkarList.innerHTML = '<div class="empty">لا توجد أذكار مطابقة للبحث.</div>'; return; }
+      items.forEach(d => {
+        const div = document.createElement('div'); div.className = 'dhikr-item';
+        div.innerHTML = `<div><div class="dhikr-text">${d}</div><div class="dhikr-meta">الهدف: ${state.goals[d]||0} | العداد: ${state.counts[d]||0}</div></div><button class="secondary">اختيار</button>`;
+        div.querySelector('button').onclick = () => { state.selectedDhikr = d; saveState(); updateUI(); };
+        adhkarList.appendChild(div);
+      });
+    }
+    function renderHistory(){
+      const events = [...getTodayData().events].reverse(); historyList.innerHTML = '';
+      if (!events.length) { historyList.innerHTML = '<div class="empty">لا يوجد سجل لليوم بعد.</div>'; return; }
+      events.forEach(item => { const div = document.createElement('div'); div.className = 'history-item'; div.innerHTML = `<strong>${item.dhikr}</strong><br>${item.action}<br><small>${item.time}</small>`; historyList.appendChild(div); });
+    }
+    function totalForDay(dayKey){ const day = state.dailyHistory[dayKey]; if (!day || !day.totals) return 0; return Object.values(day.totals).reduce((s,v)=>s+(Number(v)||0),0); }
+    function computeStats(){ let total7=0,total30=0; for(let i=0;i<7;i++) total7 += totalForDay(todayKey(i)); for(let i=0;i<30;i++) total30 += totalForDay(todayKey(i)); const activeDays = Object.keys(state.dailyHistory).filter(k => totalForDay(k)>0).length; return {total7,total30,activeDays}; }
+    function applyTheme(){ document.body.classList.toggle('dark', state.theme === 'dark'); themeToggleBtn.textContent = state.theme === 'dark' ? 'الوضع الفاتح' : 'الوضع الداكن'; }
+    function ensureAudioContext(){ if (!audioContext) { const A = window.AudioContext || window.webkitAudioContext; if (A) audioContext = new A(); } }
+    function playClickSound(){ try { if (!state.soundEnabled) return; ensureAudioContext(); if (!audioContext) return; const o=audioContext.createOscillator(), g=audioContext.createGain(); o.type='sine'; o.frequency.setValueAtTime(880, audioContext.currentTime); g.gain.setValueAtTime(.03, audioContext.currentTime); g.gain.exponentialRampToValueAtTime(.0001, audioContext.currentTime+.08); o.connect(g); g.connect(audioContext.destination); o.start(); o.stop(audioContext.currentTime+.08); } catch {} }
+    function vibrateDevice(){ if (state.vibrationEnabled && 'vibrate' in navigator) navigator.vibrate(30); }
+    function animateCountButton(){ countBtn.classList.add('pulse'); setTimeout(()=>countBtn.classList.remove('pulse'),100); }
+    function exportData(){ const blob = new Blob([JSON.stringify(state,null,2)], {type:'application/json'}); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `dhikr-backup-${todayKey()}.json`; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url); }
+    function importDataFromObject(imported){ if (!imported || typeof imported !== 'object') throw new Error('invalid'); state = imported; ensureState(); saveState(); updateUI(); }
+
+    function updateUI(){
+      ensureState(); applyTheme(); renderDhikrOptions(); renderAdhkarList(); renderHistory();
+      const count = getCurrentCount(), goal = getCurrentGoal(), percent = Math.min((count/goal)*100,100), today = getTodayData();
+      const todayCountForCurrent = today.totals[state.selectedDhikr] || 0;
+      const todayTotal = Object.values(today.totals).reduce((s,v)=>s+v,0);
+      const stats = computeStats();
+      dhikrName.textContent = state.selectedDhikr; counterEl.textContent = count; goalInput.value = goal;
+      progressText.textContent = `${count} / ${goal} تم إنجازه`; progressFill.style.width = `${percent}%`;
+      goalBadge.classList.toggle('hidden', count < goal); todayCurrentDhikrCount.textContent = todayCountForCurrent; todayTotalCount.textContent = todayTotal;
+      last7DaysTotal.textContent = stats.total7; last30DaysTotal.textContent = stats.total30; activeDaysCount.textContent = stats.activeDays; searchInput.value = state.searchTerm;
+    }
+
+    dhikrSelect.addEventListener('change', ()=>{ state.selectedDhikr = dhikrSelect.value; saveState(); updateUI(); });
+    saveGoalBtn.addEventListener('click', ()=>{ const v = Number(goalInput.value); state.goals[state.selectedDhikr] = v>0 ? v : 1; saveState(); updateUI(); });
+    countBtn.addEventListener('click', ()=>{ const d=state.selectedDhikr; state.counts[d] = getCurrentCount()+1; const today = getTodayData(); today.totals[d] = (today.totals[d]||0)+1; addHistoryEvent(d,'تمت إضافة تسبيحة واحدة'); playClickSound(); vibrateDevice(); animateCountButton(); saveState(); updateUI(); });
+    decreaseBtn.addEventListener('click', ()=>{ const d=state.selectedDhikr; if (getCurrentCount()>0) state.counts[d] = getCurrentCount()-1; saveState(); updateUI(); });
+    resetBtn.addEventListener('click', ()=>{ const d=state.selectedDhikr; state.counts[d]=0; addHistoryEvent(d,'تمت إعادة تصفير عداد هذا الذكر'); saveState(); updateUI(); });
+    searchInput.addEventListener('input', ()=>{ state.searchTerm = searchInput.value; saveState(); updateUI(); });
+    clearSearchBtn.addEventListener('click', ()=>{ state.searchTerm=''; saveState(); updateUI(); });
+    addDhikrBtn.addEventListener('click', ()=>{ const d = newDhikrInput.value.trim(); if (!d) return alert('من فضلك اكتب ذكراً أولاً.'); if (state.adhkar.includes(d)) return alert('هذا الذكر موجود بالفعل.'); state.adhkar.push(d); state.counts[d]=0; state.goals[d]=33; getTodayData().totals[d]=0; state.selectedDhikr=d; addHistoryEvent(d,'تمت إضافة ذكر جديد'); newDhikrInput.value=''; saveState(); updateUI(); });
+    newDhikrInput.addEventListener('keypress', e=>{ if (e.key==='Enter') addDhikrBtn.click(); });
+    deleteDhikrBtn.addEventListener('click', ()=>{ if (state.adhkar.length===1) return alert('لا يمكن حذف آخر ذكر موجود.'); const d=state.selectedDhikr; if (!confirm(`هل تريد حذف الذكر الحالي؟\n\n${d}`)) return; state.adhkar = state.adhkar.filter(x=>x!==d); delete state.counts[d]; delete state.goals[d]; delete getTodayData().totals[d]; addHistoryEvent(d,'تم حذف هذا الذكر'); state.selectedDhikr = state.adhkar[0]; saveState(); updateUI(); });
+    themeToggleBtn.addEventListener('click', ()=>{ state.theme = state.theme==='dark' ? 'light' : 'dark'; saveState(); updateUI(); });
+    resetTodayBtn.addEventListener('click', ()=>{ if (!confirm('هل تريد تصفير سجل اليوم بالكامل؟')) return; const tk=todayKey(); state.dailyHistory[tk] = { totals:{}, events:[] }; state.adhkar.forEach(d=>state.dailyHistory[tk].totals[d]=0); addHistoryEvent('عام','تمت إعادة تصفير سجل اليوم'); saveState(); updateUI(); });
+    exportBtn.addEventListener('click', exportData);
+    importBtn.addEventListener('click', ()=>{ importSection.classList.remove('hidden'); fileInput.click(); });
+    cancelImportBtn.addEventListener('click', ()=>{ importSection.classList.add('hidden'); importTextArea.value=''; fileInput.value=''; });
+    confirmImportBtn.addEventListener('click', ()=>{ const text=importTextArea.value.trim(); if (!text) return alert('ألصق بيانات JSON أولاً.'); try { const parsed = JSON.parse(text); if (!confirm('هل تريد استبدال البيانات الحالية بالبيانات المستوردة؟')) return; importDataFromObject(parsed); importSection.classList.add('hidden'); importTextArea.value=''; fileInput.value=''; alert('تم استيراد البيانات بنجاح.'); } catch { alert('فشل قراءة البيانات. تأكد أن النص بصيغة JSON صحيحة.'); } });
+    fileInput.addEventListener('change', e=>{ const file=e.target.files[0]; if(!file) return; const r=new FileReader(); r.onload = ev => { importSection.classList.remove('hidden'); importTextArea.value = ev.target.result; }; r.readAsText(file,'UTF-8'); });
+
+    window.addEventListener('beforeinstallprompt', e=>{ e.preventDefault(); deferredPrompt = e; installBtn.disabled = false; });
+    installBtn.addEventListener('click', async ()=>{ if (!deferredPrompt) return alert('التثبيت غير متاح حالياً. بعد النشر على الإنترنت سيعمل بشكل أفضل.'); deferredPrompt.prompt(); await deferredPrompt.userChoice; deferredPrompt = null; installBtn.disabled = true; });
+    offlineHelpBtn.addEventListener('click', ()=> alert('ارفع الملفات كلها كما هي. تأكد أن index.html و manifest.json و sw.js داخل نفس المجلد، وأن مجلد icons مرفوع أيضاً.'));
+
+    if ('serviceWorker' in navigator) { window.addEventListener('load', ()=> navigator.serviceWorker.register('./sw.js').catch(console.warn)); }
+    ensureState(); updateUI();
+  </script>
+</body>
+</html>
